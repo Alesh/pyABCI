@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.00", "setuptools_scm[toml]>=5", "wheel", "pytest"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+tag_regex = '''^(?:[\w-]+)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'''
+
+[tool.setuptools.packages.find]
+where = ["source"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+
+[project]
+name = "PyTend-ABCI"
+dynamic = ["version"]
+description = "Asyncore implementation of ABCI protocol."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "betterproto[compiler]==2.0.0b5",
+    "grpcio_tools>=1.51.1",
+]

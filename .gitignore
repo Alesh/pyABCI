@@ -1,0 +1,10 @@
+.idea
+.venv
+.data
+build
+dist
+.pytest_cache
+__pycache__
+*.egg-info
+-*
+docker-compose.override.yml
