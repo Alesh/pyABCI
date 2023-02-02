@@ -82,16 +82,16 @@ class Protocol(asyncio.Protocol):
             if self.handler is None:
                 if name in ('info', 'set_option', 'query'):
                     self.handler = await self.app.get_connection_handler(InfoHandler)
-                    self.logger.info(f"InfoConnection from {':'.join(map(str, self.remote))} defined")
+                    self.logger.info(f"InfoConnection from {':'.join(map(str, self.remote))} established")
                 elif name in ('init_chain', 'begin_block', 'deliver_tx', 'end_block', 'commit'):
                     self.handler = await self.app.get_connection_handler(ConsensusHandler)
-                    self.logger.info(f"ConsensusConnection from {':'.join(map(str, self.remote))} defined")
+                    self.logger.info(f"ConsensusConnection from {':'.join(map(str, self.remote))} established")
                 elif name in ('list_snapshots', 'offer_snapshot', 'load_snapshot_chunk', 'apply_snapshot_chunk'):
-                    self.logger.info(f"StateSyncConnection from {':'.join(map(str, self.remote))} defined")
+                    self.logger.info(f"StateSyncConnection from {':'.join(map(str, self.remote))} established")
                     self.handler = await self.app.get_connection_handler(StateSyncHandler)
                 elif name == 'check_tx':
                     self.handler = await self.app.get_connection_handler(MempoolHandler)
-                    self.logger.info(f"MempoolConnection from {':'.join(map(str, self.remote))} defined")
+                    self.logger.info(f"MempoolConnection from {':'.join(map(str, self.remote))} established")
                 else:
                     raise NotImplementedError(f'Received not implemented message `{name}`')
             if handler := getattr(self.handler, name, None):
@@ -113,7 +113,9 @@ class Protocol(asyncio.Protocol):
         finally:
             self.server_state.tasks.discard(task)
             self.response_queue.remove(task)
-            while self.response_queue and self.response_queue[0][0] == 'flush':
+            while (self.response_queue and
+                   isinstance(self.response_queue[0], tuple) and
+                   self.response_queue[0][0] == 'flush'):
                 self.process_response(*self.response_queue.popleft())
 
     def process_response(self, name: str, message: 'Message'):
