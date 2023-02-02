@@ -2,7 +2,7 @@ import struct
 from enum import IntEnum
 
 from tend.abci import BaseApplication
-from tend.abci.bhasher import BlockHasher
+from tend.abci.bhasher import BlockHasher, DummyBlockHasher
 from tend.pb.tendermint.abci import (
     RequestInfo, ResponseInfo, ResponseInitChain, ResponseCheckTx, RequestCheckTx, RequestDeliverTx,
     ResponseDeliverTx, RequestQuery, ResponseQuery, ResponseCommit, ResponseBeginBlock, ResponseEndBlock,
@@ -40,7 +40,7 @@ class Counter(BaseApplication):
         return ResponseInitChain()
 
     async def begin_block(self, _):
-        self.block_hasher = BlockHasher()
+        self.block_hasher = DummyBlockHasher()
         return ResponseBeginBlock()
 
     async def check_tx(self, req: RequestCheckTx) -> ResponseCheckTx:
@@ -56,7 +56,7 @@ class Counter(BaseApplication):
         return ResponseCheckTx(code=ResultCode.OK)
 
     async def deliver_tx(self, req: RequestDeliverTx):
-        self.block_hasher.tx_hasher(req.tx)
+        self.block_hasher.write_tx(req.tx)
         self.counter, = struct.unpack('>L', req.tx)
         logging.info(f'Accepted TX: {req.tx.hex().upper()}')
         return ResponseDeliverTx(code=ResultCode.OK)

@@ -3,9 +3,10 @@ from dataclasses import dataclass
 from enum import IntEnum
 
 from tend import abci
-from tend.abci.bhasher import BlockHasher
 from tend.abci.extend import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
 from tend.pb.tendermint.abci import ResponseQuery
+
+from tend.abci.bhasher import DummyBlockHasher
 
 
 class ResultCode(IntEnum):
@@ -55,8 +56,9 @@ class Counter(abci.ExtApplication):
     app_state: AppState
 
     def __init__(self):
+
         super().__init__(TxChecker.factory(self),
-                         TxKeeper.factory(self, BlockHasher),
+                         TxKeeper.factory(self, DummyBlockHasher),
                          initial_app_state=AppState())
 
     def load_genesis_state(self, *args):

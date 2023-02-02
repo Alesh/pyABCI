@@ -165,7 +165,7 @@ class TxKeeper(HasAppState, HasAppOptions, HasAppLogger, ConsensusHandler):
     async def deliver_tx(self, req: 'RequestDeliverTx'):
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'deliver_tx: {asdict(req)}')
-        self.block_hasher.tx_hasher(req.tx)
+        self.block_hasher.write_tx(req.tx)
         return ResponseDeliverTx(code=ResultCode.OK)
 
     async def end_block(self, req: 'RequestEndBlock'):
