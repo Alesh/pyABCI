@@ -13,6 +13,7 @@ class ResultCode(IntEnum):
     OK = 0
     EncodingError = 1
     NonceError = 2
+    QueryError = 3
 
 
 @dataclass
@@ -56,13 +57,12 @@ class Counter(abci.ExtApplication):
     app_state: AppState
 
     def __init__(self):
+        super().__init__(TxChecker.factory(self), TxKeeper.factory(self, DummyBlockHasher))
 
-        super().__init__(TxChecker.factory(self),
-                         TxKeeper.factory(self, DummyBlockHasher),
-                         initial_app_state=AppState())
-
-    def load_genesis_state(self, *args):
-        super().load_genesis_state(*args)
+    async def info(self, req):
+        if not self.app_state:
+            await self.update_app_state(AppState())
+        return await super().info(req)
 
     async def query(self, req):
         match req.path:
@@ -75,7 +75,7 @@ class Counter(abci.ExtApplication):
                                      value='0x{:08X}'.format(self.app_state.block_height).encode('utf8'))
             case _:
                 pass
-        return ResponseQuery(log=f"Invalid query path. Expected `hash` or `counter`, got {req.path}")
+        return ResponseQuery(code=ResultCode.QueryError, log=f"Invalid query path. Expected `hash` or `counter`, got {req.path}")
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, asdict
 from typing import TYPE_CHECKING
 
-from .bhasher import BlockHasher
+from .bhasher import BlockHasher, DummyBlockHasher
 
 from .handlers import (
     MempoolHandler, InfoHandler, ConsensusHandler, HasHandlers, ResultCode,
@@ -175,10 +175,11 @@ class TxKeeper(HasAppState, HasAppOptions, HasAppLogger, ConsensusHandler):
         return ResponseEndBlock()
 
     async def commit(self, req: 'RequestCommit') -> 'ResponseCommit':
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug(f'commit.')
         self.app_state.app_hash = self.block_hasher.sum()
-        await self._app.update_app_state(clone_app_state(self.app_state))
+        new_app_state = clone_app_state(self.app_state)
+        await self._app.update_app_state(new_app_state)
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(f'commit. app_state: {asdict(new_app_state)}')
         return ResponseCommit(self.app_state.app_hash)
 
     @classmethod
@@ -192,17 +193,16 @@ if TYPE_CHECKING:
     AsyncTxKeeperFactory = Coroutine[Any, Any, TxChecker]
 
 
-class ExtApplication(HasMutableAppState, HasAppLogger, HasAppOptions, HasHandlers, InfoHandler, ABC):
+class ExtApplication(HasMutableAppState, HasAppLogger, HasAppOptions, HasHandlers, InfoHandler):
     """ Abstract base class of an extended ABCI application
     """
 
     def __init__(self, async_tx_checker_factory: 'AsyncTxCheckerFactory',
-                 async_tx_keeper_factory: 'AsyncTxKeeperFactory' = None,
-                 initial_app_state: AppState = None, logger: 'Logger' = None):
-        self.__app_state = initial_app_state or AppState()
+                 async_tx_keeper_factory: 'AsyncTxKeeperFactory' = None, logger: 'Logger' = None):
+        self.__app_state = None
         self.__logger = logger or logging.root
         self._async_tx_checker_factory = async_tx_checker_factory
-        self._async_tx_keeper_factory = async_tx_keeper_factory or TxKeeper.factory(self, BlockHasher, logger)
+        self._async_tx_keeper_factory = async_tx_keeper_factory or TxKeeper.factory(self, DummyBlockHasher, logger)
         self.__options = dict()
 
     @property
@@ -220,6 +220,10 @@ class ExtApplication(HasMutableAppState, HasAppLogger, HasAppOptions, HasHandler
     async def update_app_state(self, new_app_state: 'AppState'):
         self.__app_state = new_app_state
 
+    def load_genesis_state(self, *args):
+        raise RuntimeError(f'`{self.__class__.__qualname__}`.load_genesis_state is not implemented,'
+                           + ' but `genesis.app_state` has received.')
+
     async def get_connection_handler(self, kind: 'HandlersKind') -> 'OneOfHandlers':
         match kind.__qualname__:
             case InfoHandler.__qualname__:
@@ -234,6 +238,8 @@ class ExtApplication(HasMutableAppState, HasAppLogger, HasAppOptions, HasHandler
     async def info(self, req: 'RequestInfo'):
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'info: {asdict(req)}')
+        if not self.app_state:
+            await self.update_app_state(AppState())
         return ResponseInfo(version=req.version,
                             last_block_height=self.app_state.block_height,
                             last_block_app_hash=self.app_state.app_hash)
@@ -244,7 +250,7 @@ class ExtApplication(HasMutableAppState, HasAppLogger, HasAppOptions, HasHandler
         self.__options[req.key] = req.value
         return ResponseSetOption(code=ResultCode.OK)
 
-    @abstractmethod
     async def query(self, req: 'RequestQuery') -> 'ResponseQuery':
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'query: {asdict(req)}')
+        return ResponseQuery(code=ResultCode.Error, log=f"Invalid query path")
