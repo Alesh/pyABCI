@@ -2,11 +2,11 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
-from tend import abci
-from tend.abci.extend import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
+from tend.abci.ext.bhasher import DummyBlockHasher
+from tend.abci.handlers import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
 from tend.pb.tendermint.abci import ResponseQuery
 
-from tend.abci.bhasher import DummyBlockHasher
+from tend.abci import ext as abci
 
 
 class ResultCode(IntEnum):
@@ -24,7 +24,7 @@ class AppState(abci.AppState):
 class TxChecker(abci.TxChecker):
     """ TX checker
     """
-    app_state: AppState
+    app: 'Counter'
 
     async def check_tx(self, req: 'RequestCheckTx') -> 'ResponseCheckTx':
         if len(req.tx) != 4:
@@ -32,47 +32,46 @@ class TxChecker(abci.TxChecker):
                 code=ResultCode.EncodingError,
                 log=f"Encoded value of the counter must be a four-byte hexadecimal number, like 0x00000007. But got")
         value, = struct.unpack('>L', req.tx)
-        if self.options.get('serial') == 'on':
-            if not value == self.app_state.counter + 1:
+        if self.app.options.get('serial') == 'on':
+            if not value == self.app.state.counter + 1:
                 return ResponseCheckTx(code=ResultCode.NonceError,
-                                       log=f"Invalid counter nonce. Expected {self.app_state.counter + 1}, got {value}")
+                                       log=f"Invalid counter nonce. Expected {self.app.state.counter + 1}, got {value}")
         return ResponseCheckTx(code=ResultCode.OK)
 
 
 class TxKeeper(abci.TxKeeper):
     """ TX keeper
     """
-    app_state: AppState
+    state: AppState
 
     async def deliver_tx(self, req: 'RequestDeliverTx'):
-        self.app_state.counter, = struct.unpack('>L', req.tx)
+        self.state.counter, = struct.unpack('>L', req.tx)
         logging.info(f'Accepted TX: {req.tx.hex().upper()}')
         return await super().deliver_tx(req)
 
 
-class Counter(abci.ExtApplication):
+class Counter(abci.Application):
     """ Extended ABCI Application "Counter"
     """
+
+    state: AppState
     serial: bool = False
-    app_state: AppState
 
     def __init__(self):
-        super().__init__(TxChecker.factory(self), TxKeeper.factory(self, DummyBlockHasher))
+        super().__init__(TxChecker(self), TxKeeper(self, DummyBlockHasher))
 
-    async def info(self, req):
-        if not self.app_state:
-            await self.update_app_state(AppState())
-        return await super().info(req)
+    async def get_initial_app_state(self):
+        return AppState()
 
     async def query(self, req):
         match req.path:
             case "hash":
-                return ResponseQuery(code=ResultCode.OK, value=self.app_state.app_hash)
+                return ResponseQuery(code=ResultCode.OK, value=self.state.app_hash)
             case "counter":
-                return ResponseQuery(code=ResultCode.OK, value='0x{:08X}'.format(self.app_state.counter).encode('utf8'))
+                return ResponseQuery(code=ResultCode.OK, value='0x{:08X}'.format(self.state.counter).encode('utf8'))
             case "height":
                 return ResponseQuery(code=ResultCode.OK,
-                                     value='0x{:08X}'.format(self.app_state.block_height).encode('utf8'))
+                                     value='0x{:08X}'.format(self.state.block_height).encode('utf8'))
             case _:
                 pass
         return ResponseQuery(code=ResultCode.QueryError, log=f"Invalid query path. Expected `hash` or `counter`, got {req.path}")

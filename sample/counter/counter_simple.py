@@ -2,7 +2,7 @@ import struct
 from enum import IntEnum
 
 from tend.abci import BaseApplication
-from tend.abci.bhasher import BlockHasher, DummyBlockHasher
+from tend.abci.ext.bhasher import BlockHasher, DummyBlockHasher
 from tend.pb.tendermint.abci import (
     RequestInfo, ResponseInfo, ResponseInitChain, ResponseCheckTx, RequestCheckTx, RequestDeliverTx,
     ResponseDeliverTx, RequestQuery, ResponseQuery, ResponseCommit, ResponseBeginBlock, ResponseEndBlock,

@@ -10,9 +10,6 @@ from ..pb.tendermint.abci import (
     RequestLoadSnapshotChunk, ResponseLoadSnapshotChunk, RequestApplySnapshotChunk, ResponseApplySnapshotChunk
 )
 
-if TYPE_CHECKING:
-    from typing import Type
-
 
 class ResultCode(IntEnum):
     """ ABCI result codes enum
@@ -112,6 +109,7 @@ class StateSyncHandler(ABC):
 
 
 if TYPE_CHECKING:
+    from typing import Type
     HandlersKind = Type[InfoHandler] | Type[MempoolHandler] | Type[ConsensusHandler] | Type[StateSyncHandler]
     OneOfHandlers = InfoHandler | MempoolHandler | ConsensusHandler | StateSyncHandler
 
