@@ -81,10 +81,6 @@ class CommonApp(HasAppState, HasAppLogger, HasAppOptions, ABC):
     def state(self) -> 'AppState':
         return self.__state
 
-    @abstractmethod
-    async def load_genesis(self, genesis_data: bytes):
-        """ Called when received genesis initial data """
-
     async def update_app_state(self, new_state: 'AppState'):
         if not self.__state:
             self.__state = new_state

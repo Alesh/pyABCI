@@ -8,13 +8,12 @@ from .txchecker import TxChecker
 from .txkeeper import TxKeeper
 from ..handlers import HasHandlers, InfoHandler, MempoolHandler, ConsensusHandler
 from ..handlers import ResponseInfo, ResponseSetOption, ResponseQuery, ResultCode
+from ..handlers import RequestInfo, RequestSetOption, RequestQuery
 
 if TYPE_CHECKING:
     from logging import Logger
     from typing import Union, Callable, Awaitable
     from ..handlers import HandlersKind, OneOfHandlers
-    from ..handlers import RequestInfo, RequestSetOption, RequestQuery
-    from .common import Options
 
     Checker = Union[Callable[[], Awaitable[TxChecker]], Callable[[], TxChecker], TxChecker]
     Keeper = Union[Callable[[], Awaitable[TxKeeper]], Callable[[], TxKeeper], TxKeeper]
@@ -52,10 +51,6 @@ class Application(CommonApp, HasHandlers, ABC):
     async def get_initial_app_state(self) -> 'AppState':
         """ Should return initial app state
         """
-
-    async def load_genesis(self, genesis_data: bytes):
-        raise RuntimeError(f'`{self.__class__.__qualname__}`.load_genesis_state is not implemented,'
-                           + ' but `genesis.app_state` has received.')
 
     async def info(self, req: 'RequestInfo') -> 'ResponseInfo':
         if self.logger.isEnabledFor(logging.DEBUG):

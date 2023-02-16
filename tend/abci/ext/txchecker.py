@@ -1,13 +1,9 @@
 import logging
 from abc import abstractmethod
 from dataclasses import asdict
-from typing import TYPE_CHECKING
 
-from ..handlers import MempoolHandler, ResultCode, ResponseCheckTx
 from .common import HasRelatedApp, CommonApp
-
-if TYPE_CHECKING:
-    from ..handlers import RequestCheckTx
+from ..handlers import MempoolHandler, ResultCode, ResponseCheckTx, RequestCheckTx
 
 
 class TxChecker(MempoolHandler, HasRelatedApp):
