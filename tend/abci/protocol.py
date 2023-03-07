@@ -95,6 +95,10 @@ class Protocol(asyncio.Protocol):
                 else:
                     raise NotImplementedError(f'Received not implemented message `{name}`')
             if handler := getattr(self.handler, name, None):
+                # ToDo: Rechecks latter. Message `end_block` must be processed after a last `deliver_tx`
+                while (name == 'end_block' and
+                       len([task for task in self.response_queue if isinstance(task, asyncio.Task)]) > 1):
+                    await asyncio.sleep(0.001)
                 return await handler(message)
             else:
                 raise NotImplementedError(f'Async ABCI Method `{name}` is not implemented for {handler}')
