@@ -31,7 +31,6 @@ class Counter(BaseApplication):
         return ResponseSetOption(code=ResultCode.OK)
 
     async def info(self, req: RequestInfo):
-        resp = ResponseInfo()
         return ResponseInfo(version=req.version,
                             last_block_height=self.block_height,
                             last_block_app_hash=self.app_hash)
