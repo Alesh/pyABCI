@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import betterproto
 
-from .handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler
-from ..pb.tendermint.abci import Request, Response, ResponseFlush, ResponseEcho
+from .handlers import InfoHandler, ConsensusHandler, StateSyncHandler, MempoolHandler
+from ..pb.tendermint.abci import Request, Response, ResponseEcho, ResponseFlush
 
 if TYPE_CHECKING:
     from asyncio import Transport, Task
@@ -24,11 +24,6 @@ class ServerState(ABC):
     def connections(self) -> set['Protocol']:
         """ Server connections set """
 
-    @property
-    @abstractmethod
-    def tasks(self) -> set['Task']:
-        """ Connections task set """
-
 
 class Protocol(asyncio.Protocol):
     """ ABCI Protocol
@@ -36,11 +31,12 @@ class Protocol(asyncio.Protocol):
     buffer: bytes = b''
     transport: 'Transport'
     handler: 'OneOfHandlers' = None
+    timeout: int | float = 300
 
     def __init__(self, app: 'HasHandlers', server_state: 'ServerState', logger: 'Logger' = None):
+        self.tasks: deque[tuple[str, 'Task']] = deque()
         self.logger = logger or logging.root
         self.server_state = server_state
-        self.response_queue = deque()
         self.app = app
 
     @property
@@ -53,7 +49,14 @@ class Protocol(asyncio.Protocol):
         self.server_state.connections.add(self)
 
     def connection_lost(self, exc: Exception | None) -> None:
-        self.server_state.connections.discard(self)
+        exc = exc or ConnectionResetError('Connection reset')
+
+        async def close():
+            [task.set_exception(exc) for _, task in self.tasks]
+            return await asyncio.gather(*[task for _, task in self.tasks])
+
+        close_task = asyncio.create_task(close())
+        close_task.add_done_callback(lambda: self.server_state.connections.discard(self))
 
     def data_received(self, data: bytes):
         self.buffer += data
@@ -63,22 +66,14 @@ class Protocol(asyncio.Protocol):
             if len(self.buffer) >= pos + length:
                 data, self.buffer = self.buffer[pos:pos + length], self.buffer[pos + length:]
                 name, message = betterproto.which_one_of(Request().parse(data), "value")
-                match name:
-                    case 'flush':
-                        if len(self.response_queue):
-                            self.response_queue.append((name, ResponseFlush()))
-                        else:
-                            self.process_response(name, ResponseFlush())
-                    case 'echo':
-                        self.process_response(name, ResponseEcho(message.message))
-                    case _:
-                        self.process_request(name, message)
+                self.process_request(name, message)
             else:
                 break
 
     def process_request(self, name: str, message: 'Message'):
 
-        async def async_response() -> 'Message':
+        async def async_response(name: str, message: 'Message') -> 'Message':
+            # create handler if missing
             if self.handler is None:
                 if name in ('info', 'set_option', 'query'):
                     self.handler = await self.app.get_connection_handler(InfoHandler)
@@ -92,35 +87,51 @@ class Protocol(asyncio.Protocol):
                 elif name == 'check_tx':
                     self.handler = await self.app.get_connection_handler(MempoolHandler)
                     self.logger.info(f"MempoolConnection from {':'.join(map(str, self.remote))} established")
-                else:
-                    raise NotImplementedError(f'Received not implemented message `{name}`')
-            if handler := getattr(self.handler, name, None):
-                # ToDo: Rechecks latter. Message `end_block` must be processed after a last `deliver_tx`
-                while (name == 'end_block' and
-                       len([task for task in self.response_queue if isinstance(task, asyncio.Task)]) > 1):
-                    await asyncio.sleep(0.001)
-                return await handler(message)
+
+            # process message
+            async def response_echo():
+                return ResponseEcho(message.message)
+
+            async def response_flush():
+                return ResponseFlush()
+
+            try:
+                response = None
+                if self.handler is not None:
+                    if handler := getattr(self.handler, name, None):
+                        response = await handler(message)
+                if response is None:
+                    if name == 'echo':
+                        response = await response_echo()
+                    elif name == 'flush':
+                        response = await response_flush()
+                if response is None:
+                    raise NotImplementedError(f'Async ABCI Method `{name}` is not implemented')
+                return response
+            except:
+                logging.exception(f'Async ABCI method `{name}` has failed', exc_info=True)
+                raise
+
+        task = asyncio.create_task(async_response(name, message))
+        self.tasks.append((name, task))
+        task.add_done_callback(lambda _: self.process_response_tasks())
+
+    def process_response_tasks(self):
+        while len(self.tasks):
+            name, task = self.tasks[0]
+            if task.done():
+                self.process_response_task(name, task)
             else:
-                raise NotImplementedError(f'Async ABCI Method `{name}` is not implemented for {handler}')
+                break
 
-        task = asyncio.create_task(async_response())
-        self.server_state.tasks.add(task)
-        self.response_queue.append(task)
-        task.add_done_callback(lambda task: self.process_response_task(task, name))
-
-    def process_response_task(self, task: 'Task', name: str):
+    def process_response_task(self, name: str, task: 'Task'):
         try:
-            self.process_response(name, task.result())
-        except NotImplementedError as exc:
-            args = exc.args or (f'Async ABCI Method `{name}` is not implemented',)
-            raise NotImplementedError(*args)
+            if task.exception():
+                raise task.exception()
+            else:
+                self.process_response(name, task.result())
         finally:
-            self.server_state.tasks.discard(task)
-            self.response_queue.remove(task)
-            while (self.response_queue and
-                   isinstance(self.response_queue[0], tuple) and
-                   self.response_queue[0][0] == 'flush'):
-                self.process_response(*self.response_queue.popleft())
+            self.tasks.remove((name, task))
 
     def process_response(self, name: str, message: 'Message'):
         data = bytes(Response(**{name: message}))

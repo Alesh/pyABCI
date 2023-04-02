@@ -2,6 +2,7 @@ import asyncio
 import logging
 import signal
 import sys
+from time import time
 from asyncio import CancelledError
 from typing import TYPE_CHECKING
 
@@ -17,7 +18,6 @@ class Server(ServerState):
     """ ABCI application server
     """
     connections: set['Protocol'] = set()
-    tasks: set['Task'] = set()
 
     def __init__(self, app: 'HasHandlers', logger: 'Logger' = None):
         self._srv = None
@@ -54,8 +54,10 @@ class Server(ServerState):
     async def stop(self):
         if self._srv is not None:
             self.logger.info("ABCI server is stopping ... ")
-            tasks = [*self.tasks]
-            [task.cancel() for task in tasks]
-            await asyncio.gather(*tasks, return_exceptions=True)
+            for connection in self.connections:
+                connection.transport.close()
+            deadline = time() + Protocol.timeout + 1
+            while len(self.connections) and deadline > time():
+                await asyncio.sleep(0.1)
             self._srv.close()
             await self._srv.wait_closed()

@@ -5,11 +5,12 @@ import pytest
 from tend.abci import Protocol
 from tend.abci.handlers import ResponseInfo, RequestInfo, RequestBeginBlock, RequestDeliverTx, RequestEndBlock
 from tend.pb.tendermint.abci import RequestFlush, RequestEcho, ResponseBeginBlock, ResponseDeliverTx, ResponseEndBlock
-from .mocks import ServerState, MockTransport, StubApplication
-from .mocks import message_to_bytes
+from tests.mocks import ServerState, MockTransport, StubApplication
+from tests.mocks import message_to_bytes
 
 
-def test_echo_flush():
+@pytest.mark.asyncio
+async def test_echo_flush():
     protocol = Protocol(StubApplication(), ServerState())
     transport = MockTransport()
 
@@ -20,7 +21,7 @@ def test_echo_flush():
     protocol.data_received(message_to_bytes(req))
     req = RequestFlush()
     protocol.data_received(message_to_bytes(req))
-
+    await asyncio.sleep(0.1)
     assert transport._buffer == b'\x10\x12\x06\n\x04TEST\x04\x1a\x00'
 
 
@@ -88,5 +89,5 @@ async def test_begin_deliver_end_flush():
     req = RequestFlush()
     protocol.data_received(message_to_bytes(req))
 
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.3)
     assert transport._buffer == b'\x04B\x00\x0eR\x05\x12\x03TX0\x12R\x07\x08\x01\x12\x03TX2\x12R\x07\x08\x01\x12\x03TX1\x04Z\x00\x04\x1a\x00'
