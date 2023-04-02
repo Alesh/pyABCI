@@ -89,5 +89,5 @@ async def test_begin_deliver_end_flush():
     req = RequestFlush()
     protocol.data_received(message_to_bytes(req))
 
-    await asyncio.sleep(0.3)
-    assert transport._buffer == b'\x04B\x00\x0eR\x05\x12\x03TX0\x12R\x07\x08\x01\x12\x03TX2\x12R\x07\x08\x01\x12\x03TX1\x04Z\x00\x04\x1a\x00'
+    await asyncio.sleep(0.31)
+    assert transport._buffer == b'\x04B\x00\x0eR\x05\x12\x03TX0\x12R\x07\x08\x01\x12\x03TX1\x12R\x07\x08\x01\x12\x03TX2\x04Z\x00\x04\x1a\x00'

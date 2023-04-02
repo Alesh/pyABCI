@@ -11,6 +11,7 @@ from ..pb.tendermint.abci import Request, Response, ResponseEcho, ResponseFlush
 
 if TYPE_CHECKING:
     from asyncio import Transport, Task
+    from typing import Coroutine
     from betterproto import Message
     from logging import Logger
     from .handlers import OneOfHandlers, HasHandlers
@@ -31,10 +32,11 @@ class Protocol(asyncio.Protocol):
     buffer: bytes = b''
     transport: 'Transport'
     handler: 'OneOfHandlers' = None
+    current_task: 'Task' = None
     timeout: int | float = 300
 
     def __init__(self, app: 'HasHandlers', server_state: 'ServerState', logger: 'Logger' = None):
-        self.tasks: deque[tuple[str, 'Task']] = deque()
+        self.tasks: deque[tuple[str, 'Coroutine']] = deque()
         self.logger = logger or logging.root
         self.server_state = server_state
         self.app = app
@@ -49,14 +51,8 @@ class Protocol(asyncio.Protocol):
         self.server_state.connections.add(self)
 
     def connection_lost(self, exc: Exception | None) -> None:
-        exc = exc or ConnectionResetError('Connection reset')
-
-        async def close():
-            [task.set_exception(exc) for _, task in self.tasks]
-            return await asyncio.gather(*[task for _, task in self.tasks])
-
-        close_task = asyncio.create_task(close())
-        close_task.add_done_callback(lambda: self.server_state.connections.discard(self))
+        assert len(self.tasks) > 0
+        self.server_state.connections.discard(self)
 
     def data_received(self, data: bytes):
         self.buffer += data
@@ -112,26 +108,26 @@ class Protocol(asyncio.Protocol):
                 logging.exception(f'Async ABCI method `{name}` has failed', exc_info=True)
                 raise
 
-        task = asyncio.create_task(async_response(name, message))
-        self.tasks.append((name, task))
-        task.add_done_callback(lambda _: self.process_response_tasks())
+        self.tasks.append((name, async_response(name, message)))
+        self.process_response_tasks()
 
     def process_response_tasks(self):
-        while len(self.tasks):
-            name, task = self.tasks[0]
-            if task.done():
-                self.process_response_task(name, task)
-            else:
-                break
+        def response_task_done(task):
+            try:
+                if task.exception():
+                    raise task.exception()
+                else:
+                    self.process_response(name, task.result())
+            finally:
+                self.tasks.popleft()
+                self.current_task = None
+                self.process_response_tasks()
 
-    def process_response_task(self, name: str, task: 'Task'):
-        try:
-            if task.exception():
-                raise task.exception()
-            else:
-                self.process_response(name, task.result())
-        finally:
-            self.tasks.remove((name, task))
+        # ToDo: determined (ordered) execution only for ConsensusHandler, other may be executed cooperative
+        if self.current_task is None and len(self.tasks):
+            name, coro = self.tasks[0]
+            self.current_task = asyncio.create_task(coro)
+            self.current_task.add_done_callback(response_task_done)
 
     def process_response(self, name: str, message: 'Message'):
         data = bytes(Response(**{name: message}))
