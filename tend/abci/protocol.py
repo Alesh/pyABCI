@@ -25,6 +25,10 @@ class ServerState(ABC):
     def connections(self) -> set['Protocol']:
         """ Server connections set """
 
+    @abstractmethod
+    async def stop(self):
+        """ Stop server """
+
 
 class Protocol(asyncio.Protocol):
     """ ABCI Protocol
@@ -51,8 +55,11 @@ class Protocol(asyncio.Protocol):
         self.server_state.connections.add(self)
 
     def connection_lost(self, exc: Exception | None) -> None:
-        assert len(self.tasks) > 0
         self.server_state.connections.discard(self)
+        if self.handler:
+            self.logger.info(f"Connection from {':'.join(map(str, self.remote))} closed")
+        if len(self.server_state.connections) == 0:
+            asyncio.create_task(self.server_state.stop())
 
     def data_received(self, data: bytes):
         self.buffer += data
@@ -118,6 +125,9 @@ class Protocol(asyncio.Protocol):
                     raise task.exception()
                 else:
                     self.process_response(name, task.result())
+            except Exception as exc:
+                logging.exception(exc, exc_info=True)
+                self.transport.abort()
             finally:
                 self.tasks.popleft()
                 self.current_task = None

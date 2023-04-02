@@ -21,6 +21,7 @@ class Server(ServerState):
 
     def __init__(self, app: 'HasHandlers', logger: 'Logger' = None):
         self._srv = None
+        self._stopping = False
         self.logger = logger or logging.root
         self.app = app
 
@@ -52,7 +53,8 @@ class Server(ServerState):
             self._srv = None
 
     async def stop(self):
-        if self._srv is not None:
+        if self._srv is not None and not self._stopping:
+            self._stopping = True
             self.logger.info("ABCI server is stopping ... ")
             for connection in self.connections:
                 connection.transport.close()
