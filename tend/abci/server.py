@@ -2,22 +2,19 @@ import asyncio
 import logging
 import signal
 import sys
-from time import time
 from asyncio import CancelledError
-from typing import TYPE_CHECKING
+from logging import Logger
+from time import time
 
+from .handlers import HasHandlers
 from .protocol import Protocol, ServerState
-
-if TYPE_CHECKING:
-    from asyncio import Task
-    from logging import Logger
-    from .handlers import HasHandlers
 
 
 class Server(ServerState):
     """ ABCI application server
     """
     connections: set['Protocol'] = set()
+    close_timeout: int | float = 300
 
     def __init__(self, app: 'HasHandlers', logger: 'Logger' = None):
         self._srv = None
@@ -58,7 +55,7 @@ class Server(ServerState):
             self.logger.info("ABCI server is stopping ... ")
             for connection in self.connections:
                 connection.transport.close()
-            deadline = time() + Protocol.timeout + 1
+            deadline = time() + self.close_timeout
             while len(self.connections) and deadline > time():
                 await asyncio.sleep(0.1)
             self._srv.close()

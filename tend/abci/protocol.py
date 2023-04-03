@@ -1,24 +1,21 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from asyncio import Transport, Task
 from collections import deque
-from typing import TYPE_CHECKING
+from logging import Logger
+from typing import Coroutine, Callable
 
 import betterproto
+from betterproto import Message
 
-from .handlers import InfoHandler, ConsensusHandler, StateSyncHandler, MempoolHandler
+from .handlers import HasHandlers, OneOfHandlers, HandlersKind
+from .handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler
 from ..pb.tendermint.abci import Request, Response, ResponseEcho, ResponseFlush
-
-if TYPE_CHECKING:
-    from asyncio import Transport, Task
-    from typing import Coroutine
-    from betterproto import Message
-    from logging import Logger
-    from .handlers import OneOfHandlers, HasHandlers
 
 
 class ServerState(ABC):
-    """ Server state """
+    """ Server state interface """
 
     @property
     @abstractmethod
@@ -30,17 +27,70 @@ class ServerState(ABC):
         """ Stop server """
 
 
+DoneCallback = Callable[[Task], None]
+
+
+class MessageTaskProcessor(ABC):
+    """ Message task processor interface """
+
+    @abstractmethod
+    def __call__(self, coro: 'Coroutine', done_callback: 'DoneCallback'):
+        """  Processes request message  """
+
+
+class RequestOrderedTaskProcessor(MessageTaskProcessor):
+    """ Strong request/response ordered message task processor """
+    current_task: 'Task' = None
+    tasks: deque[('Coroutine', 'DoneCallback')] = deque()
+
+    def __call__(self, coro: 'Coroutine', done_callback: 'DoneCallback'):
+        self.tasks.append((coro, done_callback))
+        if self.current_task is None:
+            self._turn()
+
+    def _done(self, task, done_callback):
+        self.current_task = None
+        done_callback(task)
+
+    def _turn(self):
+        if self.current_task is None and len(self.tasks):
+            coro, done_callback = self.tasks.popleft()
+            self.current_task = task = asyncio.create_task(coro)
+            task.add_done_callback(lambda task: self._done(task, done_callback))
+            task.add_done_callback(lambda _: self._turn())
+
+
+class ResponseOrderedTaskProcessor(MessageTaskProcessor):
+    """ Only response ordered message task processor """
+    tasks: deque[('Task', 'DoneCallback')] = deque()
+
+    def __call__(self, coro: 'Coroutine', done_callback: 'DoneCallback'):
+        task = asyncio.create_task(coro)
+        self.tasks.append((task, done_callback))
+        task.add_done_callback(lambda _: self._turn())
+
+    def _turn(self):
+        while len(self.tasks):
+            task, done_callback = self.tasks[0]
+            if task.done():
+                try:
+                    done_callback(task)
+                finally:
+                    self.tasks.popleft()
+            else:
+                break
+
+
 class Protocol(asyncio.Protocol):
     """ ABCI Protocol
     """
     buffer: bytes = b''
     transport: 'Transport'
     handler: 'OneOfHandlers' = None
-    current_task: 'Task' = None
-    timeout: int | float = 300
+    handler_type: 'HandlersKind' = None
 
     def __init__(self, app: 'HasHandlers', server_state: 'ServerState', logger: 'Logger' = None):
-        self.tasks: deque[tuple[str, 'Coroutine']] = deque()
+        self.message_processor = ResponseOrderedTaskProcessor()
         self.logger = logger or logging.root
         self.server_state = server_state
         self.app = app
@@ -74,70 +124,48 @@ class Protocol(asyncio.Protocol):
                 break
 
     def process_request(self, name: str, message: 'Message'):
+        if self.handler_type is None:
+            if name in ('info', 'set_option', 'query'):
+                self.handler_type = InfoHandler
+                self.logger.info(f"InfoConnection from {':'.join(map(str, self.remote))} established")
+            elif name in ('init_chain', 'begin_block', 'deliver_tx', 'end_block', 'commit'):
+                self.handler_type = ConsensusHandler
+                self.message_processor = RequestOrderedTaskProcessor()
+                self.logger.info(f"ConsensusConnection from {':'.join(map(str, self.remote))} established")
+            elif name in ('list_snapshots', 'offer_snapshot', 'load_snapshot_chunk', 'apply_snapshot_chunk'):
+                self.handler_type = StateSyncHandler
+                self.logger.info(f"StateSyncConnection from {':'.join(map(str, self.remote))} established")
+            elif name == 'check_tx':
+                self.handler_type = MempoolHandler
+                self.logger.info(f"MempoolConnection from {':'.join(map(str, self.remote))} established")
 
         async def async_response(name: str, message: 'Message') -> 'Message':
-            # create handler if missing
-            if self.handler is None:
-                if name in ('info', 'set_option', 'query'):
-                    self.handler = await self.app.get_connection_handler(InfoHandler)
-                    self.logger.info(f"InfoConnection from {':'.join(map(str, self.remote))} established")
-                elif name in ('init_chain', 'begin_block', 'deliver_tx', 'end_block', 'commit'):
-                    self.handler = await self.app.get_connection_handler(ConsensusHandler)
-                    self.logger.info(f"ConsensusConnection from {':'.join(map(str, self.remote))} established")
-                elif name in ('list_snapshots', 'offer_snapshot', 'load_snapshot_chunk', 'apply_snapshot_chunk'):
-                    self.logger.info(f"StateSyncConnection from {':'.join(map(str, self.remote))} established")
-                    self.handler = await self.app.get_connection_handler(StateSyncHandler)
-                elif name == 'check_tx':
-                    self.handler = await self.app.get_connection_handler(MempoolHandler)
-                    self.logger.info(f"MempoolConnection from {':'.join(map(str, self.remote))} established")
-
-            # process message
-            async def response_echo():
-                return ResponseEcho(message.message)
-
-            async def response_flush():
-                return ResponseFlush()
-
+            if self.handler is None and self.handler_type is not None:
+                self.handler = await self.app.get_connection_handler(self.handler_type)
             try:
-                response = None
                 if self.handler is not None:
                     if handler := getattr(self.handler, name, None):
-                        response = await handler(message)
-                if response is None:
-                    if name == 'echo':
-                        response = await response_echo()
-                    elif name == 'flush':
-                        response = await response_flush()
-                if response is None:
-                    raise NotImplementedError(f'Async ABCI Method `{name}` is not implemented')
-                return response
+                        return await handler(message)
+                if name == 'echo':
+                    return ResponseEcho(message.message)
+                elif name == 'flush':
+                    return ResponseFlush()
+                raise NotImplementedError(f'Async ABCI Method `{name}` is not implemented')
             except:
-                logging.exception(f'Async ABCI method `{name}` has failed', exc_info=True)
+                logging.critical(f'Async ABCI method `{name}` has failed')
                 raise
 
-        self.tasks.append((name, async_response(name, message)))
-        self.process_response_tasks()
+        self.message_processor(async_response(name, message), lambda task: self.process_task_done(name, task))
 
-    def process_response_tasks(self):
-        def response_task_done(task):
-            try:
-                if task.exception():
-                    raise task.exception()
-                else:
-                    self.process_response(name, task.result())
-            except Exception as exc:
-                logging.exception(exc, exc_info=True)
-                self.transport.abort()
-            finally:
-                self.tasks.popleft()
-                self.current_task = None
-                self.process_response_tasks()
-
-        # ToDo: determined (ordered) execution only for ConsensusHandler, other may be executed cooperative
-        if self.current_task is None and len(self.tasks):
-            name, coro = self.tasks[0]
-            self.current_task = asyncio.create_task(coro)
-            self.current_task.add_done_callback(response_task_done)
+    def process_task_done(self, name: str, task: 'Task'):
+        try:
+            if task.exception():
+                raise task.exception()
+            else:
+                self.process_response(name, task.result())
+        except Exception as exc:
+            logging.exception(exc, exc_info=True)
+            self.transport.abort()
 
     def process_response(self, name: str, message: 'Message'):
         data = bytes(Response(**{name: message}))

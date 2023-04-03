@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import TYPE_CHECKING
+from typing import Type
 
 from ..pb.tendermint.abci import (
     RequestInfo, ResponseInfo, ResponseSetOption, RequestSetOption, RequestDeliverTx, ResponseDeliverTx,
@@ -108,10 +108,8 @@ class StateSyncHandler(ABC):
         """"""
 
 
-if TYPE_CHECKING:
-    from typing import Type
-    HandlersKind = Type[InfoHandler] | Type[MempoolHandler] | Type[ConsensusHandler] | Type[StateSyncHandler]
-    OneOfHandlers = InfoHandler | MempoolHandler | ConsensusHandler | StateSyncHandler
+HandlersKind = Type[InfoHandler] | Type[MempoolHandler] | Type[ConsensusHandler] | Type[StateSyncHandler]
+OneOfHandlers = InfoHandler | MempoolHandler | ConsensusHandler | StateSyncHandler
 
 
 class HasHandlers(ABC):
@@ -122,11 +120,3 @@ class HasHandlers(ABC):
     async def get_connection_handler(self, kind: 'HandlersKind') -> 'OneOfHandlers':
         """ Returns instance of requested handler.
         """
-
-
-class BaseApplication(HasHandlers, InfoHandler, MempoolHandler, ConsensusHandler, ABC):
-    """ Abstract base class of a simple monolithic ABCI application
-    """
-
-    async def get_connection_handler(self, kind: 'HandlersKind') -> 'OneOfHandlers':
-        return self

@@ -1,11 +1,10 @@
 import asyncio
 import re
-from asyncio import Task
 
 import betterproto
 
 from tend import abci
-from tend.abci import Protocol
+from tend.abci.protocol import ServerState, Protocol
 from tend.abci.handlers import (
     RequestCommit
 )
@@ -27,11 +26,13 @@ class MockTransport(asyncio.Transport):
         self._buffer += data
 
 
-class ServerState(abci.ServerState):
-    """ Application server state
+class MockServerState(ServerState):
+    """ Mock server state
     """
     connections: set['Protocol'] = set()
-    tasks: set['Task'] = set()
+
+    async def stop(self):
+        pass
 
 
 class StubApplication(abci.BaseApplication):
@@ -39,13 +40,21 @@ class StubApplication(abci.BaseApplication):
     """
 
     async def info(self, req): pass
+
     async def init_chain(self, req): pass
+
     async def set_option(self, req): pass
+
     async def query(self, req): pass
+
     async def check_tx(self, req): pass
+
     async def begin_block(self, req): pass
+
     async def deliver_tx(self, req): pass
+
     async def end_block(self, req): pass
+
     async def commit(self, req: 'RequestCommit'): pass
 
 
