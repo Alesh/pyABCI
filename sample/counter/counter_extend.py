@@ -2,11 +2,11 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
-from tend.abci.ext.bhasher import DummyBlockHasher
-from tend.abci.handlers import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
-from tend.pb.tendermint.abci import ResponseQuery
+from abci.ext.bhasher import DummyBlockHasher
+from abci.handlers import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
+from abci.pb.tendermint.abci import ResponseQuery
 
-from tend.abci import ext as abci
+from abci import ext as abci
 
 
 class ResultCode(IntEnum):
@@ -42,10 +42,10 @@ class TxChecker(abci.TxChecker):
 class TxKeeper(abci.TxKeeper):
     """ TX keeper
     """
-    state: AppState
+    app: 'Counter'
 
     async def deliver_tx(self, req: 'RequestDeliverTx'):
-        self.state.counter, = struct.unpack('>L', req.tx)
+        self.app.state.counter, = struct.unpack('>L', req.tx)
         logging.info(f'Accepted TX: {req.tx.hex().upper()}')
         return await super().deliver_tx(req)
 
@@ -80,7 +80,7 @@ class Counter(abci.Application):
 if __name__ == '__main__':
     import logging
     import asyncio
-    from tend.abci import Server
+    from abci import Server
 
     logging.basicConfig(level=logging.INFO)
     asyncio.run(Server(Counter()).start())

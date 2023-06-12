@@ -3,12 +3,12 @@ import re
 
 import betterproto
 
-from tend import abci
-from tend.abci.protocol import ServerState, Protocol
-from tend.abci.handlers import (
+import abci
+from abci.protocol import ServerState, Protocol
+from abci.handlers import (
     RequestCommit
 )
-from tend.pb.tendermint.abci import Request, Response
+from abci.pb.tendermint.abci import Request, Response
 
 
 class MockTransport(asyncio.Transport):

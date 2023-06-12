@@ -11,7 +11,7 @@ from betterproto import Message
 
 from .handlers import HasHandlers, OneOfHandlers, HandlersKind
 from .handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler
-from ..pb.tendermint.abci import Request, Response, ResponseEcho, ResponseFlush
+from .pb.tendermint.abci import Request, Response, ResponseEcho, ResponseFlush
 
 
 class ServerState(ABC):

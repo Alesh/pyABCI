@@ -6,8 +6,9 @@ build-backend = "setuptools.build_meta"
 version_scheme = "no-guess-dev"
 tag_regex = '''^(?:[\w-]+)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'''
 
-[tool.setuptools.packages.find]
-include = ["tend*"]
+[tool.setuptools]
+packages = ["abci"]
+py-modules = ["protogen"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -17,7 +18,7 @@ testpaths = [
 ]
 
 [project]
-name = "PyTend-ABCI"
+name = "AsyncABCI"
 dynamic = ["version"]
 description = "Asyncore implementation of ABCI protocol."
 readme = "README.md"
@@ -26,3 +27,6 @@ dependencies = [
     "betterproto[compiler]==2.0.0b5",
     "grpcio_tools>=1.51.1",
 ]
+
+[project.scripts]
+protogen = "protogen:main"

@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from tend.abci import Protocol
-from tend.abci.handlers import ResponseInfo, RequestInfo, RequestBeginBlock, RequestDeliverTx, RequestEndBlock
-from tend.pb.tendermint.abci import RequestFlush, RequestEcho, ResponseBeginBlock, ResponseDeliverTx, ResponseEndBlock, \
+from abci import Protocol
+from abci.handlers import ResponseInfo, RequestInfo, RequestBeginBlock, RequestDeliverTx, RequestEndBlock
+from abci.pb.tendermint.abci import RequestFlush, RequestEcho, ResponseBeginBlock, ResponseDeliverTx, ResponseEndBlock, \
     RequestCommit, RequestCheckTx
 from tests.mocks import MockServerState, MockTransport, StubApplication
 from tests.mocks import message_to_bytes

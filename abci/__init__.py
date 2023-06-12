@@ -1,5 +1,5 @@
 """
-Asyncore implementation of ABCI protocol
+Asynchronous implementation of the ABCI protocol
 """
 from abc import ABC
 

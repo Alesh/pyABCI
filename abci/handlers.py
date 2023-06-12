@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import IntEnum
 from typing import Type
 
-from ..pb.tendermint.abci import (
+from .pb.tendermint.abci import (
     RequestInfo, ResponseInfo, ResponseSetOption, RequestSetOption, RequestDeliverTx, ResponseDeliverTx,
     ResponseCheckTx, RequestCheckTx, ResponseQuery, RequestQuery, RequestCommit, ResponseCommit, RequestInitChain,
     ResponseInitChain, ResponseBeginBlock, RequestBeginBlock, RequestEndBlock, ResponseEndBlock,

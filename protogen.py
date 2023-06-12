@@ -1,17 +1,23 @@
+import sys
 import os.path
 import subprocess
 import tempfile
 from urllib.request import urlretrieve
 
-import tend
 
 def main():
+    if len(sys.argv) == 2:
+        output_path = sys.argv[1]
+    else:
+        print("Usage: protogen OUTPUT_PATH ")
+        sys.exit(2)
+
     bases = {
-        'tendermint': 'https://raw.githubusercontent.com/tendermint/tendermint/main/proto/',
+
+        'tendermint': 'https://raw.githubusercontent.com/tendermint/tendermint/v0.34.24/proto',
         'gogoproto': 'https://raw.githubusercontent.com/gogo/protobuf/master/'
     }
     proto_path = os.path.join(tempfile.mkdtemp(), 'proto')
-    output_path = os.path.join(tend.__path__._path[0], 'pb')
     os.makedirs(output_path, exist_ok=True)
     proto_files = [
         'tendermint/abci/types.proto',

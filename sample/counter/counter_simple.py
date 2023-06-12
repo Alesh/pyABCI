@@ -1,9 +1,9 @@
 import struct
 from enum import IntEnum
 
-from tend.abci import BaseApplication
-from tend.abci.ext.bhasher import BlockHasher, DummyBlockHasher
-from tend.pb.tendermint.abci import (
+from abci import BaseApplication
+from abci.ext.bhasher import BlockHasher, DummyBlockHasher
+from abci.pb.tendermint.abci import (
     RequestInfo, ResponseInfo, ResponseInitChain, ResponseCheckTx, RequestCheckTx, RequestDeliverTx,
     ResponseDeliverTx, RequestQuery, ResponseQuery, ResponseCommit, ResponseBeginBlock, ResponseEndBlock,
     RequestSetOption, ResponseSetOption
@@ -84,7 +84,7 @@ class Counter(BaseApplication):
 if __name__ == '__main__':
     import logging
     import asyncio
-    from tend.abci import Server
+    from abci import Server
 
     logging.basicConfig(level=logging.INFO)
     asyncio.run(Server(Counter()).start())

@@ -1,2 +1,2 @@
-# PyTend-ABCI
-Asyncore implementation of ABCI protocol.
+# AsyncABCI
+Asynchronous implementation of the ABCI protocol

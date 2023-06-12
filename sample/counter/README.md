@@ -1,11 +1,11 @@
-# Samples of using **PyTend-ABCI**  
+# Samples of using **AsyncABCI**  
 
 ## Counter application
 First you need to run docker-compose with the tendermint node and then need 
-to install **PyTend-ABC** with the following commands, preferably in a virtual 
+to install **AsyncABC** with the following commands, preferably in a virtual 
 environment. 
 ```shell
-pip install git+https://github.com/curtapp/PyTend-ABCI.git@master
+pip install git+https://github.com/Alesh/AsyncABCI.git@master
 ```
 After that, run the "pure" or "extend" version of the application.
  * `counter_simple.py` -- ABCI application built with **pure API**
