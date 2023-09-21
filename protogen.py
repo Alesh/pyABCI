@@ -13,7 +13,6 @@ def main():
         sys.exit(2)
 
     bases = {
-
         'tendermint': 'https://raw.githubusercontent.com/tendermint/tendermint/v0.34.24/proto',
         'gogoproto': 'https://raw.githubusercontent.com/gogo/protobuf/master/'
     }

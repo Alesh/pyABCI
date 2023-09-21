@@ -24,8 +24,7 @@ description = "Asyncore implementation of ABCI protocol."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "betterproto[compiler]==2.0.0b5",
-    "grpcio_tools>=1.51.1",
+    "betterproto[compiler]==2.0.0b6",
 ]
 
 [project.scripts]
