@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 
 from abci.ext.bhasher import DummyBlockHasher
-from abci.handlers import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
+from abci.abc.handlers import RequestCheckTx, ResponseCheckTx, RequestDeliverTx
 from abci.pb.tendermint.abci import ResponseQuery
 
 from abci import ext as abci

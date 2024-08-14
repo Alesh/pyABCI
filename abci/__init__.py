@@ -3,7 +3,7 @@ Asynchronous implementation of the ABCI protocol
 """
 from abc import ABC
 
-from .handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler, HasHandlers
+from abci.abc.handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler, HasHandlers
 from .server import Server
 from .protocol import Protocol
 

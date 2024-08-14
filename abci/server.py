@@ -6,7 +6,7 @@ from asyncio import CancelledError
 from logging import Logger
 from time import time
 
-from .handlers import HasHandlers
+from abci.abc.handlers import HasHandlers
 from .protocol import Protocol, ServerState
 
 

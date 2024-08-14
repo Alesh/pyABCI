@@ -9,8 +9,8 @@ from typing import Coroutine, Callable
 import betterproto
 from betterproto import Message
 
-from .handlers import HasHandlers, OneOfHandlers, HandlersKind
-from .handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler
+from abci.abc.handlers import HasHandlers, OneOfHandlers, HandlersKind
+from abci.abc.handlers import InfoHandler, MempoolHandler, ConsensusHandler, StateSyncHandler
 from .pb.tendermint.abci import Request, Response, ResponseEcho, ResponseFlush
 
 
