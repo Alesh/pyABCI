@@ -1,62 +1,90 @@
 import asyncio
-import logging
 import signal
 import sys
-from asyncio import CancelledError
-from logging import Logger
-from time import time
 
-from abci.abc.handlers import HasHandlers
-from .protocol import Protocol, ServerState
+from abci.abc import Application
+from abci.abc.connections import ConnectionsHolder
+from abci.protocol import Protocol
 
 
-class Server(ServerState):
-    """ ABCI application server
+class Server(ConnectionsHolder):
+    """ ABCI 2.0 application server
     """
-    connections: set['Protocol'] = set()
-    close_timeout: int | float = 300
 
-    def __init__(self, app: 'HasHandlers', logger: 'Logger' = None):
-        self._srv = None
-        self._stopping = False
-        self.logger = logger or logging.root
+    def __init__(self, app: Application):
+        super().__init__(logger=app.logger, on_empty=self.stop)
         self.app = app
+        self._server: asyncio.Server | None = None
+        self._run_forever: asyncio.Task | None = None
 
-    async def start(self, host='0.0.0.0', port=26658, **server_options):
-        if self._srv is not None:
-            raise RuntimeError('Already started')
+    def __await__(self):
+        return self._run_forever.__await__()
 
-        def make_connection():
-            conn = Protocol(self.app, self, self.logger)
-            return conn
+    @property
+    def active(self):
+        """ True if the server is active """
+        return self._server is not None and self._server.is_serving()
 
+    async def start(self, host='127.0.0.1', port=26658, **server_opts):
+        """ Start the server """
         loop = asyncio.get_running_loop()
-        on_windows = sys.platform.lower() == "windows"
-        if not on_windows:
-            loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(self.stop()))
-            loop.add_signal_handler(signal.SIGTERM, lambda: asyncio.create_task(self.stop()))
+        if sys.platform.lower() != "windows":
+            loop.add_signal_handler(signal.SIGINT, lambda: self.stop())
+            loop.add_signal_handler(signal.SIGTERM, lambda: self.stop())
+        self._server = await loop.create_server(lambda: Protocol(self.app, self), host, port, **server_opts)
+        self.logger.info(f"ABCI server is listening on {host}:{port}")
 
-        self._srv = await loop.create_server(make_connection, host, port, **server_options)
-        try:
-            async with self._srv:
-                self.logger.info(f"ABCI server is listening on {host}:{port}")
-                await self._srv.serve_forever()
-        except CancelledError:
-            pass
-        except KeyboardInterrupt:
-            loop.run_until_complete(self.stop())
-        finally:
-            self.logger.info("ABCI server has stopped")
-            self._srv = None
+        async def run_forever():
+            try:
+                async with self._server:
+                    await self._server.serve_forever()
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                self.stop()
+                if self._server.is_serving():
+                    loop.run_until_complete(self._server.wait_closed())
+            finally:
+                self.logger.info("ABCI server has stopped")
 
-    async def stop(self):
-        if self._srv is not None and not self._stopping:
-            self._stopping = True
-            self.logger.info("ABCI server is stopping ... ")
-            for connection in self.connections:
-                connection.transport.close()
-            deadline = time() + self.close_timeout
-            while len(self.connections) and deadline > time():
-                await asyncio.sleep(0.1)
-            self._srv.close()
-            await self._srv.wait_closed()
+        self._run_forever = asyncio.create_task(run_forever())
+
+    def stop(self):
+        """ Stop the server """
+        for connection in self.connections:
+            connection.transport.close()
+        self._server.close()
+
+
+def main():
+    import getopt
+    from abci.utils import resolve_app
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "ap", ["host=", "port="])
+        if len(args) != 1:
+            raise getopt.GetoptError("Wrong number of arguments")
+    except getopt.GetoptError as err:
+        print(err)
+        print(f"Usage: {sys.argv[0]} -h | --help")
+        sys.exit(2)
+
+    app = resolve_app(args[0])
+    host = '127.0.0.1'
+    port = 26658
+    for opt, value in opts:
+        if opt in ("-a", "--host"):
+            host = value
+        elif opt in ("-p", "--port"):
+            port = int(value)
+        else:
+            assert False, "unhandled option"
+
+    async def async_run():
+        server = Server(app)
+        await server.start(host, port)
+        await server
+
+    asyncio.run(async_run())
+
+
+if __name__ == '__main__':
+    main()

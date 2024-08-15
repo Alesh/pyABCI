@@ -1,31 +1,37 @@
 [build-system]
-requires = ["setuptools>=61.00", "setuptools_scm[toml]>=5", "wheel", "pytest"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools_scm]
-version_scheme = "no-guess-dev"
-tag_regex = '''^(?:[\w-]+)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'''
+[project]
+name = "pyABCI"
+description = "Asynchronous implementation of the ABCI2 protocol"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT License" }
+dynamic = ["version", "dependencies", "optional-dependencies"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+]
 
-[tool.setuptools]
-packages = ["abci"]
-py-modules = ["protogen"]
+[project.urls]
+Homepage = "https://github.com/Alesh/pyABCI"
+Issues = "https://github.com/Alesh/pyABCI/issues"
+
+[tool.setuptools.packages.find]
+include = ["abci*"]
+namespaces = true
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies.dev = { file = ["tests/requirements.txt"] }
+
+[tool.setuptools_scm]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra -q --ignore-glob=**/-*"
 testpaths = [
     "tests",
 ]
-
-[project]
-name = "AsyncABCI"
-dynamic = ["version"]
-description = "Asyncore implementation of ABCI protocol."
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "betterproto[compiler]==2.0.0b6",
-]
-
-[project.scripts]
-protogen = "protogen:main"
