@@ -1,1 +1,1 @@
-pure-protobuf
+pure-protobuf @ git+https://github.com/Alesh/pure-protobuf.git@master

@@ -56,5 +56,6 @@ class KVStore(SimpleApp):
             csv_writer.writerows([(key, value) for key, value in self._store.items()])
         return ResponseCommit(self.last_block_height)
 
+
 app = KVStore()
 logging.basicConfig(level=logging.DEBUG)

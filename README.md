@@ -1,4 +1,4 @@
-## `pyABCI2` ABCI 2.0 protocol implementation
+## `pyABCI` ABCI 2.0 protocol implementation
 
 This implementation is asynchronous with minimal dependencies and as simple 
 as possible. The repository contains a working example of KVStore, which 

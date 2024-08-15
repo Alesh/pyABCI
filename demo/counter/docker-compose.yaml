@@ -1,9 +1,0 @@
-version: '3.2'
-
-services:
-
-  counter:
-    image: tendermint/tendermint:v0.34.24
-    container_name: AsyncABCI-counter
-    command: start --proxy_app tcp://127.0.0.1:26658
-    network_mode: "host"
