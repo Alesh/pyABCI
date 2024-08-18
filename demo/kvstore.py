@@ -11,14 +11,14 @@ class KVStore(SimpleApp):
 
     def __init__(self):
         super().__init__(lambda value: self._store.__setitem__('__last_block_height', value))
-        self._store = dict()
-        self._filename = os.path.join(os.path.dirname(__file__), 'kvstore.csv')
+        self._store = dict()  # type: dict[str, str]
+        self._filename = os.path.join(os.path.curdir, 'kvstore.csv')
         if os.path.exists(self._filename):
             with open(self._filename, 'r') as f:
                 csv_reader = csv.reader(f)
                 self._store = dict((key, value) for key, value in csv_reader)
         else:
-            self._store['__last_block_height'] = 0
+            self._store['__last_block_height'] = '0'
 
     @property
     def last_block_height(self):
@@ -32,7 +32,7 @@ class KVStore(SimpleApp):
         resp = await super().query(req)
         if resp.key:
             if value := self._store.get(resp.key.decode('utf8')):
-                resp.value = value
+                resp.value = value.encode('utf8')
                 resp.log = "exists"
         return resp
 
@@ -43,6 +43,7 @@ class KVStore(SimpleApp):
                 raise
         except:
             return ResponseCheckTx(code=1, log="Wrong key=value")
+        return ResponseCheckTx(code=0)
 
     async def finalize_block(self, req: RequestFinalizeBlock):
         for tx in req.txs:

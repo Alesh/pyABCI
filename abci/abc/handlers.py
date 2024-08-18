@@ -86,11 +86,11 @@ class StateSyncHandler(ABC):
         to offer the snapshot to the Application. """
 
     @abstractmethod
-    async def load_snapshotChunk(self, req: RequestLoadSnapshotChunk) -> ResponseLoadSnapshotChunk:
+    async def load_snapshot_chunk(self, req: RequestLoadSnapshotChunk) -> ResponseLoadSnapshotChunk:
         """ Used by CometBFT to retrieve snapshot chunks from the Application to send to peers.
         """
 
     @abstractmethod
-    async def apply_snapshot_cChunk(self, req: RequestApplySnapshotChunk) -> ResponseApplySnapshotChunk:
+    async def apply_snapshot_chunk(self, req: RequestApplySnapshotChunk) -> ResponseApplySnapshotChunk:
         """ Used by CometBFT to hand snapshot chunks to the Application.
         """

@@ -1,4 +1,4 @@
-from abci.proto.tendermint import (
+from abci.types import (
     Request, RequestInfo, RequestFlush, RequestEcho, Response, ResponseEcho, ResponseFlush,
     ResponseInfo
 )

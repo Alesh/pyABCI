@@ -64,8 +64,8 @@ class SimpleApp(abc.Application, ConsensusHandler, InfoHandler, MempoolHandler, 
     async def offer_snapshot(self, req: RequestOfferSnapshot) -> ResponseOfferSnapshot:
         return ResponseOfferSnapshot()
 
-    async def load_snapshotChunk(self, req: RequestLoadSnapshotChunk) -> ResponseLoadSnapshotChunk:
+    async def load_snapshot_chunk(self, req: RequestLoadSnapshotChunk) -> ResponseLoadSnapshotChunk:
         return ResponseLoadSnapshotChunk()
 
-    async def apply_snapshot_cChunk(self, req: RequestApplySnapshotChunk) -> ResponseApplySnapshotChunk:
+    async def apply_snapshot_chunk(self, req: RequestApplySnapshotChunk) -> ResponseApplySnapshotChunk:
         return ResponseApplySnapshotChunk()

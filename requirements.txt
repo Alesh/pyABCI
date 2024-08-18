@@ -1,1 +1,1 @@
-pure-protobuf @ git+https://github.com/Alesh/pure-protobuf.git@master
+pure-protobuf>=3.1.2
